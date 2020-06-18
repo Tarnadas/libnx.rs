@@ -1,9 +1,9 @@
 use proc_macro2::Literal;
 use std::collections::HashMap;
 use std::env;
-use std::fs::File;
+use std::fs::{canonicalize, File};
 use std::io::{BufWriter, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 fn parse(errcodes: &str) -> impl DoubleEndedIterator<Item = (u32, &str)> {
     let from_start = errcodes
@@ -44,6 +44,18 @@ fn main() {
     .unwrap();
 
     drop(file);
+
+    let mut file = File::create("switch.specs").unwrap();
+
+    write!(file, "
+%rename link                old_link
+
+*link:
+%(old_link) -T {}/switch.ld -pie --gc-sections -z text -z nodynamic-undefined-weak --build-id=sha1 --nx-module-name
+
+*startfile:
+crti%O%s crtbegin%O%s
+", canonicalize(&PathBuf::from(".")).unwrap().display()).unwrap();
 
     let include_path = "/opt/devkitpro/libnx/include/";
     cpp_build::Config::new()
